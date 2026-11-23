@@ -5,6 +5,11 @@ from networks.base_model import BaseModel, init_weights
 import sys
 from models import get_model
 
+def build_loss(name):
+    return {'bce': nn.BCEWithLogitsLoss, 'mse': nn.MSELoss,
+            'l1': nn.L1Loss, 'huber': nn.SmoothL1Loss}[name]()
+
+
 class Trainer(BaseModel):
     def name(self):
         return 'Trainer'
@@ -12,7 +17,8 @@ class Trainer(BaseModel):
     def __init__(self, opt):
         super(Trainer, self).__init__(opt)
         self.opt = opt  
-        self.model = get_model(opt.arch, 1, opt.select_k, True)
+        self.model = get_model(opt.arch, 1, opt.select_k, True,
+                                layer_range=getattr(opt, 'layer_range', (11, 20)))
         # torch.nn.init.normal_(self.model.fc.weight.data, 0.0, opt.init_gain)
 
         if opt.fix_backbone:
@@ -35,14 +41,15 @@ class Trainer(BaseModel):
         else:
             raise ValueError("optim should be [adam, sgd]")
 
-        self.loss_fn = nn.BCEWithLogitsLoss()
+        self.loss_fn = build_loss(getattr(opt, 'loss', 'bce'))  # 'bce' = original detection behaviour
 
         self.model.to(opt.gpu_ids[0])
         
 
 
-    def adjust_learning_rate(self, epoch, total_epochs, min_lr=1e-6):
-        self.model.layer_selector.temperature = 1.0 - 0.9 * (epoch / total_epochs)
+    def adjust_learning_rate(self, min_lr=1e-6):
+        # (the original referenced a non-existent `layer_selector` and had a signature
+        #  that train.py never matched, so the first LR drop would have crashed)
         for param_group in self.optimizer.param_groups:
             param_group['lr'] /= 10.
             if param_group['lr'] < min_lr:

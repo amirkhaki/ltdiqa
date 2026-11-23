@@ -16,15 +16,30 @@ class BaseModel(nn.Module):
     def save_networks(self, save_filename):
         save_path = os.path.join(self.save_dir, save_filename)
 
+        model_sd = self.model.state_dict()
+        if getattr(self.opt, 'save_trainable_only', False):
+            # the frozen CLIP backbone is ~1.7 GB in fp32 and identical in every checkpoint
+            trainable = {n for n, p in self.model.named_parameters() if p.requires_grad}
+            model_sd = {k: v for k, v in model_sd.items() if k in trainable}
+
         # serialize model and optimizer to dict
         state_dict = {
-            'model': self.model.state_dict(),
+            'model': model_sd,
             'optimizer' : self.optimizer.state_dict(),
             'total_steps' : self.total_steps,
         }
 
         torch.save(state_dict, save_path)
 
+
+    def load_networks(self, path):
+        """Load a checkpoint written by save_networks (full or trainable-only)."""
+        ckpt = torch.load(path, map_location='cpu')
+        missing, unexpected = self.model.load_state_dict(ckpt['model'], strict=False)
+        trainable = {n for n, p in self.model.named_parameters() if p.requires_grad}
+        if unexpected or (trainable & set(missing)):
+            raise RuntimeError(f'bad checkpoint {path}: unexpected={unexpected[:3]} '
+                               f'missing_trainable={sorted(trainable & set(missing))[:3]}')
 
     def eval(self):
         self.model.eval()

@@ -33,12 +33,12 @@ VALID_NAMES = [
 
 
 
-def get_model(name, num_classes, select_k, training):
+def get_model(name, num_classes, select_k, training, **kwargs):
     assert name in VALID_NAMES
     if name.startswith("Imagenet:"):
         # return ImagenetModel(name[9:]) 
-        return CLIPModel(name[5:], num_classes, select_k, training)  
+        return CLIPModel(name[5:], num_classes, select_k, training, **kwargs)  
     elif name.startswith("CLIP:"):
-        return CLIPModel(name[5:], num_classes, select_k, training)  
+        return CLIPModel(name[5:], num_classes, select_k, training, **kwargs)  
     else:
         assert False 

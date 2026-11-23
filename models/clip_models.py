@@ -68,12 +68,17 @@ class LayerSelector(nn.Module):
         
         batch_size = all_features.shape[0]
 
-        expanded_logits = self.logits.unsqueeze(0).expand(batch_size, -1)
-        
-        selection_probs = F.gumbel_softmax(expanded_logits, 
-                                           tau=self.current_tau, 
-                                           hard=True, 
-                                           dim=-1)
+        if self.training:
+            expanded_logits = self.logits.unsqueeze(0).expand(batch_size, -1)
+            selection_probs = F.gumbel_softmax(expanded_logits,
+                                               tau=self.current_tau,
+                                               hard=True,
+                                               dim=-1)
+        else:
+            # eval: pick the arg-max window instead of sampling, so predictions are deterministic
+            best = self.logits.argmax()
+            selection_probs = F.one_hot(best, self.num_choices).to(all_features.dtype)
+            selection_probs = selection_probs.unsqueeze(0).expand(batch_size, -1).contiguous()
 
         all_windows = []
         for i in range(self.num_choices):
@@ -96,7 +101,7 @@ class LayerSelector(nn.Module):
 
 
 class CLIPModel(nn.Module):
-    def __init__(self, name, num_classes=1, select_num=5, training=True, cnt={}):
+    def __init__(self, name, num_classes=1, select_num=5, training=True, cnt={}, layer_range=(11, 20)):
         super(CLIPModel, self).__init__()
 
         print(name)
@@ -107,11 +112,12 @@ class CLIPModel(nn.Module):
         self.model.requires_grad_(False)
         
         self.hooks = []
-        for i in range(11,20) :
+        # hooked ViT blocks are [layer_range[0], layer_range[1]) -- (11, 20) is the paper's setting
+        for i in range(*layer_range) :
             self.hooks.append(Hook(f'block_{i}', self.model.visual.transformer.resblocks[i]))
     
         # span = 2
-        proj_dim = 1024
+        proj_dim = self.model.visual.transformer.width  # 1024 for ViT-L/14, 768 for ViT-B/16
         self.sequence_length = len(self.hooks)
 
         self.selector = LayerSelector(num_layers=self.sequence_length, select_k=select_num, cnt=cnt,training=True)
