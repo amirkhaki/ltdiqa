@@ -107,11 +107,13 @@ def build_loaders(args):
     train_tf = build_train_transform(args.crop, mean, std, args.resize_short)
     eval_tf = GridCrops(args.crop, args.test_grid, mean, std, args.resize_short)
     ratios = tuple(args.split_ratios)
+    split_csv = dict(kv.split('=', 1) for kv in args.split_csv)  # {'KonIQ-10k': '/path/to.csv'}
 
     train_parts, val_sets, test_sets, norms = [], {}, {}, {}
     for name in args.train_sets:
         recs = load_records(name, args.dataset_root, args.download)
-        splits = get_splits(name, [r.key for r in recs], args.split_dir, args.split_seed, ratios)
+        splits = get_splits(name, [r.key for r in recs], args.split_dir, args.split_seed, ratios,
+                             split_csv=split_csv.get(name))
         by_key = {r.key: r for r in recs}
         pick = lambda part: [by_key[k] for k in splits[part]]
         norm = ScoreNorm.fit([r.score for r in pick("train")])

@@ -34,6 +34,9 @@ def get_args():
     p.add_argument('--eval_sets', nargs='*', default=[], help='extra test sets (cross-dataset if not in --train_sets)')
     p.add_argument('--split_dir', default='./splits')
     p.add_argument('--split_seed', type=int, default=0)
+    p.add_argument('--split_csv', nargs='*', default=[], metavar='NAME=PATH',
+                   help='official split CSVs (columns image_name,set), e.g. KonIQ-10k=koniq10k_distributions_sets.csv; '
+                        'overrides the random split for that dataset')
     p.add_argument('--split_ratios', type=float, nargs=3, default=[0.8, 0.1, 0.1], metavar=('TRAIN', 'VAL', 'TEST'))
     p.add_argument('--crop', type=int, default=224)
     p.add_argument('--resize_short', type=int, default=0, help='resize short side first; 0 = keep native resolution')
